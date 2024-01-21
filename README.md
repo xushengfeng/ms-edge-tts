@@ -1,5 +1,8 @@
 # MsEdgeTTS
-[![npm version](https://badge.fury.io/js/msedge-tts.svg)](https://badge.fury.io/js/msedge-tts)
+
+[![npm version](https://badge.fury.io/js/msedge-tts-browserify.svg)](https://badge.fury.io/js/msedge-tts-browserify)
+
+msedge-tts-browserify clone from [Migushthe2nd/MsEdgeTTS](https://github/Migushthe2nd/MsEdgeTTS), which based on nodejs. To better use it on browser, I rewrite some codes--remove node `stream`, `fs` and `crypto`, replace `axios` with `fetch`. This repo **only** support browser but nodejs.
 
 An simple Azure Speech Service module that uses the Microsoft Edge Read Aloud API.
 
@@ -28,7 +31,7 @@ Use a library like [xml-escape](https://www.npmjs.com/package/xml-escape).
 ### Write to stream
 
 ```js
-import {MsEdgeTTS, OUTPUT_FORMAT} from "msedge-tts";
+import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 const tts = new MsEdgeTTS();
 await tts.setMetadata("en-IE-ConnorNeural", OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS);
@@ -44,44 +47,6 @@ readable.on("close", () => {
 });
 ```
 
-### Write to file
-
-```js
-import {MsEdgeTTS, OUTPUT_FORMAT} from "msedge-tts";
-
-(async () => {
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS);
-    const filePath = await tts.toFile("./example_audio.webm", "Hi, how are you?");  
-})();
-```
-
-### Change voice rate, pitch and volume
-```js
-import {MsEdgeTTS, OUTPUT_FORMAT} from "msedge-tts";
-
-(async () => {
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS);
-    const filePath = await tts.toFile("./example_audio.webm", "Hi, how are you?", {rate: 0.5, pitch: "+200Hz"});
-})();
-```
-
-### Use an alternative HTTP Agent
-Use a custom http.Agent implementation like [https-proxy-agent](https://github.com/TooTallNate/proxy-agents) or [socks-proxy-agent](https://github.com/TooTallNate/proxy-agents/tree/main/packages/socks-proxy-agent).
-```js
-import {SocksProxyAgent} from 'socks-proxy-agent';
-
-(async () => {
-    const agent = new SocksProxyAgent("socks://your-name%40gmail.com:abcdef12345124@br41.nordvpn.com")
-    const tts = new MsEdgeTTS(agent);
-    await tts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS);
-    const filePath = await tts.toFile("./example_audio.webm", "Hi, how are you?");
-})();
-```
-
 ## API
-
-For the full documentation check out the [API Documentation](https://migushthe2nd.github.io/MsEdgeTTS).
 
 This library only supports promises.
