@@ -1,14 +1,53 @@
-import axios from "axios";
-import * as stream from "stream";
-import WebSocket from "isomorphic-ws";
-import {Buffer} from "buffer";
-import {randomBytes} from "crypto";
-import {OUTPUT_FORMAT} from "./OUTPUT_FORMAT";
-import * as fs from "fs";
-import {Agent} from "http";
-import {PITCH} from "./PITCH";
-import {RATE} from "./RATE";
-import {VOLUME} from "./VOLUME";
+import { Buffer } from "buffer";
+import { OUTPUT_FORMAT } from "./OUTPUT_FORMAT";
+import { PITCH } from "./PITCH";
+import { RATE } from "./RATE";
+import { VOLUME } from "./VOLUME";
+
+function generateRandomValue(length: number) {
+    let cryptoObj = window.crypto;
+    let randomValues = new Uint8Array(length);
+    cryptoObj.getRandomValues(randomValues);
+    return Array.from(randomValues, function (byte) {
+        return ("0" + byte.toString(16)).slice(-2);
+    }).join("");
+}
+
+class s {
+    eventListeners: { [key: string]: ((...arg) => void)[] } = {};
+    end = false;
+    constructor() {
+        this.eventListeners = {};
+    }
+
+    push(item: any) {
+        if (item) {
+            this.emit("data", item);
+        } else {
+            if (!this.end) {
+                this.emit("end", null);
+                this.end = true;
+            } else {
+                this.emit("closed", null);
+            }
+        }
+    }
+
+    on(eventName: string, callback: (...arg) => void) {
+        if (!this.eventListeners[eventName]) {
+            this.eventListeners[eventName] = [];
+        }
+        this.eventListeners[eventName].push(callback);
+    }
+
+    emit(eventName: string, data: any) {
+        if (this.eventListeners[eventName]) {
+            this.eventListeners[eventName].forEach((callback) => {
+                callback(data);
+            });
+        }
+    }
+}
 
 export type Voice = {
     Name: string;
@@ -18,7 +57,7 @@ export type Voice = {
     SuggestedCodec: string;
     FriendlyName: string;
     Status: string;
-}
+};
 
 export class ProsodyOptions {
     /**
@@ -54,13 +93,12 @@ export class MsEdgeTTS {
     private _voice;
     private _voiceLocale;
     private _outputFormat;
-    private _queue: { [key: string]: stream.Readable } = {};
+    private _queue: { [key: string]: s } = {};
     private _startTime = 0;
-    private readonly _agent: Agent;
 
     private _log(...o: any[]) {
         if (this._enableLogger) {
-            console.log(...o)
+            console.log(...o);
         }
     }
 
@@ -70,8 +108,7 @@ export class MsEdgeTTS {
      * @param agent (optional, **NOT SUPPORTED IN BROWSER**) Use a custom http.Agent implementation like [https-proxy-agent](https://github.com/TooTallNate/proxy-agents) or [socks-proxy-agent](https://github.com/TooTallNate/proxy-agents/tree/main/packages/socks-proxy-agent).
      * @param enableLogger=false whether to enable the built-in logger. This logs connections inits, disconnects, and incoming data to the console
      */
-    public constructor(agent?: Agent, enableLogger: boolean = false) {
-        this._agent = agent;
+    public constructor(agent?, enableLogger: boolean = false) {
         this._enableLogger = enableLogger;
         this._isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
     }
@@ -84,21 +121,18 @@ export class MsEdgeTTS {
             this._log("connecting: ", i);
             await this._initClient();
         }
-        this._ws.send(message, () => {
-            this._log("<- sent message: ", message);
-        });
+        this._ws.send(message);
     }
 
     private _initClient() {
-        this._ws = this._isBrowser
-            ? new WebSocket(MsEdgeTTS.SYNTH_URL)
-            : new WebSocket(MsEdgeTTS.SYNTH_URL, {agent: this._agent});
+        this._ws = new WebSocket(MsEdgeTTS.SYNTH_URL);
 
         this._ws.binaryType = "arraybuffer";
         return new Promise((resolve, reject) => {
             this._ws.onopen = () => {
-                this._log("Connected in", (Date.now() - this._startTime) / 1000, "seconds")
-                this._send(`Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n
+                this._log("Connected in", (Date.now() - this._startTime) / 1000, "seconds");
+                this._send(
+                    `Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n
                     {
                         "context": {
                             "synthesis": {
@@ -112,11 +146,12 @@ export class MsEdgeTTS {
                             }
                         }
                     }
-                `).then(resolve);
+                `
+                ).then(resolve);
             };
             this._ws.onmessage = (m) => {
                 const buffer = Buffer.from(m.data as ArrayBuffer);
-                const message = buffer.toString()
+                const message = buffer.toString();
                 const requestId = /X-RequestId:(.*?)\r\n/gm.exec(message)[1];
                 if (message.includes("Path:turn.start")) {
                     // start of turn, ignore
@@ -127,20 +162,20 @@ export class MsEdgeTTS {
                     // context response, ignore
                 } else if (message.includes("Path:audio")) {
                     if (m.data instanceof ArrayBuffer) {
-                        this.cacheAudioData(buffer, requestId)
+                        this.cacheAudioData(buffer, requestId);
                     } else {
                         this._log("UNKNOWN MESSAGE", message);
                     }
                 } else {
                     this._log("UNKNOWN MESSAGE", message);
                 }
-            }
+            };
             this._ws.onclose = () => {
-                this._log("disconnected after:", (Date.now() - this._startTime) / 1000, "seconds")
+                this._log("disconnected after:", (Date.now() - this._startTime) / 1000, "seconds");
                 for (const requestId in this._queue) {
                     this._queue[requestId].push(null);
                 }
-            }
+            };
             this._ws.onerror = function (error) {
                 reject("Connect Error: " + error);
             };
@@ -151,7 +186,7 @@ export class MsEdgeTTS {
         const index = m.indexOf(MsEdgeTTS.BINARY_DELIM) + MsEdgeTTS.BINARY_DELIM.length;
         const audioData = m.slice(index, m.length);
         this._queue[requestId].push(audioData);
-        this._log("receive audio chunk size: ", audioData?.length)
+        this._log("receive audio chunk size: ", audioData?.length);
     }
 
     private _SSMLTemplate(input: string, options: ProsodyOptions = new ProsodyOptions()): string {
@@ -171,8 +206,11 @@ export class MsEdgeTTS {
      */
     getVoices(): Promise<Voice[]> {
         return new Promise((resolve, reject) => {
-            axios.get(MsEdgeTTS.VOICES_URL)
-                .then((res) => resolve(res.data))
+            fetch(MsEdgeTTS.VOICES_URL, {
+                method: "get",
+            })
+                .then((json) => json.json())
+                .then((res) => resolve(res))
                 .catch(reject);
         });
     }
@@ -200,20 +238,19 @@ export class MsEdgeTTS {
         }
         this._outputFormat = outputFormat;
 
-        const changed = oldVoice !== this._voice
-            || oldVoiceLocale !== this._voiceLocale
-            || oldOutputFormat !== this._outputFormat;
+        const changed =
+            oldVoice !== this._voice || oldVoiceLocale !== this._voiceLocale || oldOutputFormat !== this._outputFormat;
 
         // create new client
         if (changed || this._ws.readyState !== this._ws.OPEN) {
-            this._startTime = Date.now()
+            this._startTime = Date.now();
             await this._initClient();
         }
     }
 
     private _metadataCheck() {
-        if (!this._ws) throw new Error(
-            "Speech synthesis not configured yet. Run setMetadata before calling toStream or toFile.");
+        if (!this._ws)
+            throw new Error("Speech synthesis not configured yet. Run setMetadata before calling toStream or toFile.");
     }
 
     /**
@@ -224,37 +261,14 @@ export class MsEdgeTTS {
     }
 
     /**
-     * Writes raw audio synthesised from text to a file. Uses a basic {@link _SSMLTemplate SML template}.
-     *
-     * @param path a valid output path, including a filename and file extension.
-     * @param input the input to synthesise
-     * @param options (optional) {@link ProsodyOptions}
-     * @returns {Promise<string>} - a `Promise` with the full filepath
-     */
-    toFile(path: string, input: string, options?: ProsodyOptions): Promise<string> {
-        return this._rawSSMLRequestToFile(path, this._SSMLTemplate(input, options));
-    }
-
-    /**
      * Writes raw audio synthesised from text in real-time to a {@link stream.Readable}. Uses a basic {@link _SSMLTemplate SML template}.
      *
      * @param input the text to synthesise. Can include SSML elements.
      * @param options (optional) {@link ProsodyOptions}
      * @returns {stream.Readable} - a `stream.Readable` with the audio data
      */
-    toStream(input, options?: ProsodyOptions): stream.Readable {
+    toStream(input, options?: ProsodyOptions): s {
         return this._rawSSMLRequest(this._SSMLTemplate(input, options));
-    }
-
-    /**
-     * Writes raw audio synthesised from text to a file. Has no SSML template. Basic SSML should be provided in the request.
-     *
-     * @param path a valid output path, including a filename and file extension.
-     * @param requestSSML the SSML to send. SSML elements required in order to work.
-     * @returns {Promise<string>} - a `Promise` with the full filepath
-     */
-    rawToFile(path: string, requestSSML: string): Promise<string> {
-        return this._rawSSMLRequestToFile(path, requestSSML);
     }
 
     /**
@@ -263,44 +277,21 @@ export class MsEdgeTTS {
      * @param requestSSML the SSML to send. SSML elements required in order to work.
      * @returns {stream.Readable} - a `stream.Readable` with the audio data
      */
-    rawToStream(requestSSML): stream.Readable {
+    rawToStream(requestSSML): s {
         return this._rawSSMLRequest(requestSSML);
     }
 
-    private _rawSSMLRequestToFile(path: string, requestSSML: string): Promise<string> {
-        return new Promise(async (resolve, reject) => {
-            const stream = this._rawSSMLRequest(requestSSML);
-            const chunks = [];
-
-            stream.on("data", (data) => chunks.push(data));
-
-            stream.once("close", async () => {
-                if (Object.keys(this._queue).length > 0 && chunks.length === 0) {
-                    reject("No audio data received");
-                }
-                const output = fs.createWriteStream(path);
-                while (chunks.length > 0) {
-                    await new Promise((resolve) => output.write(chunks.shift(), resolve));
-                }
-                resolve(path);
-            });
-        });
-    }
-
-    private _rawSSMLRequest(requestSSML): stream.Readable {
+    private _rawSSMLRequest(requestSSML): s {
         this._metadataCheck();
 
-        const requestId = randomBytes(16).toString("hex");
-        const request = `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n
+        const requestId = generateRandomValue(16);
+        const request =
+            `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n
                 ` + requestSSML.trim();
         // https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/speech-synthesis-markup
-        const readable = new stream.Readable({
-            read() {
-            },
-        });
+        const readable = new s();
         this._queue[requestId] = readable;
         this._send(request).then();
         return readable;
     }
-
 }
