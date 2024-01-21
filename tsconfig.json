@@ -1,0 +1,19 @@
+{
+    "include": [
+        "src/**/*"
+    ],
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "module": "commonjs",
+        "target": "ES6",
+        "declaration": true,
+        "outDir": "dist",
+        "skipLibCheck": true,
+        "esModuleInterop": true
+    },
+    "typedocOptions": {
+        "entryPoints": ["src/index.ts"],
+        "out": "docs",
+        "excludePrivate": true
+    }
+}
