@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/msedge-tts-browserify.svg)](https://badge.fury.io/js/msedge-tts-browserify)
 
-msedge-tts-browserify clone from [Migushthe2nd/MsEdgeTTS](https://github/Migushthe2nd/MsEdgeTTS), which based on nodejs. To better use it on browser, I rewrite some codes--remove node `stream`, `fs` and `crypto`, replace `axios` with `fetch`. This repo **only** support browser but nodejs.
+msedge-tts-browserify clone from [Migushthe2nd/MsEdgeTTS](https://github.com/Migushthe2nd/MsEdgeTTS), which based on nodejs. To better use it on browser, I rewrite some codes--remove node `stream`, `fs` and `crypto`, replace `axios` with `fetch`. This repo **only** support browser but nodejs.
 
 An simple Azure Speech Service module that uses the Microsoft Edge Read Aloud API.
 
