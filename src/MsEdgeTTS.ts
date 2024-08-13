@@ -20,17 +20,17 @@ class s {
         this.eventListeners = {};
     }
 
-    push(item: any) {
-        if (item) {
-            this.emit("data", item);
-        } else {
-            if (!this.end) {
-                this.emit("end", null);
-                this.end = true;
-            } else {
-                this.emit("closed", null);
-            }
-        }
+    Pdata(item) {
+        this.emit("data", item);
+    }
+
+    Pend(data: metadata) {
+        this.emit("end", data);
+        this.end = true;
+    }
+
+    Pclosed() {
+        this.emit("closed", null);
     }
 
     on(eventName: string, callback: (...arg) => void) {
@@ -38,6 +38,13 @@ class s {
             this.eventListeners[eventName] = [];
         }
         this.eventListeners[eventName].push(callback);
+    }
+
+    onEnd(cb: (metadata: metadata) => void) {
+        if (!this.eventListeners.end) {
+            this.eventListeners.end = [];
+        }
+        this.eventListeners.end.push(cb);
     }
 
     emit(eventName: string, data: any) {
@@ -58,6 +65,19 @@ export type Voice = {
     FriendlyName: string;
     Status: string;
 };
+
+type metadata = {
+    Type: "WordBoundary" | "SentenceBoundary";
+    Data: {
+        Offset: number;
+        Duration: number;
+        text: {
+            Text: string;
+            Length: number;
+            BoundaryType: "WordBoundary" | "SentenceBoundary";
+        };
+    };
+}[];
 
 export class ProsodyOptions {
     /**
@@ -128,6 +148,7 @@ export class MsEdgeTTS {
         this._ws = new WebSocket(MsEdgeTTS.SYNTH_URL);
 
         this._ws.binaryType = "arraybuffer";
+        const datas: metadata = [];
         return new Promise((resolve, reject) => {
             this._ws.onopen = () => {
                 this._log("Connected in", (Date.now() - this._startTime) / 1000, "seconds");
@@ -138,10 +159,10 @@ export class MsEdgeTTS {
                             "synthesis": {
                                 "audio": {
                                     "metadataoptions": {
-                                        "sentenceBoundaryEnabled": "false",
-                                        "wordBoundaryEnabled": "false"
+                                        "sentenceBoundaryEnabled": "true",
+                                        "wordBoundaryEnabled": "true"
                                     },
-                                    "outputFormat": "${this._outputFormat}" 
+                                    "outputFormat": "${this._outputFormat}"
                                 }
                             }
                         }
@@ -157,7 +178,7 @@ export class MsEdgeTTS {
                     // start of turn, ignore
                 } else if (message.includes("Path:turn.end")) {
                     // end of turn, close stream
-                    this._queue[requestId].push(null);
+                    this._queue[requestId].Pend(datas);
                 } else if (message.includes("Path:response")) {
                     // context response, ignore
                 } else if (message.includes("Path:audio")) {
@@ -165,6 +186,11 @@ export class MsEdgeTTS {
                         this.cacheAudioData(buffer, requestId);
                     } else {
                         this._log("UNKNOWN MESSAGE", message);
+                        if (message.includes("Path:audio.metadata")) {
+                            const startIndex = message.indexOf("{");
+                            const t = message.slice(startIndex);
+                            datas.push(JSON.parse(t).Metadata[0]);
+                        }
                     }
                 } else {
                     this._log("UNKNOWN MESSAGE", message);
@@ -173,7 +199,7 @@ export class MsEdgeTTS {
             this._ws.onclose = () => {
                 this._log("disconnected after:", (Date.now() - this._startTime) / 1000, "seconds");
                 for (const requestId in this._queue) {
-                    this._queue[requestId].push(null);
+                    this._queue[requestId].Pclosed();
                 }
             };
             this._ws.onerror = function (error) {
@@ -185,7 +211,7 @@ export class MsEdgeTTS {
     private cacheAudioData(m: Buffer, requestId: string) {
         const index = m.indexOf(MsEdgeTTS.BINARY_DELIM) + MsEdgeTTS.BINARY_DELIM.length;
         const audioData = m.slice(index, m.length);
-        this._queue[requestId].push(audioData);
+        this._queue[requestId].Pdata(audioData);
         this._log("receive audio chunk size: ", audioData?.length);
     }
 
@@ -195,7 +221,7 @@ export class MsEdgeTTS {
                 <voice name="${this._voice}">
                     <prosody pitch="${options.pitch}" rate="${options.rate}" volume="${options.volume}">
                         ${input}
-                    </prosody> 
+                    </prosody>
                 </voice>
             </speak>`;
     }
