@@ -14,6 +14,7 @@
         "prepublishOnly": "npm run build"
     },
     "devDependencies": {
+        "@biomejs/biome": "^1.8.3",
         "typescript": "^4.3.2",
         "vite": "^5.4.0"
     },

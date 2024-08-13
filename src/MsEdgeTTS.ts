@@ -1,16 +1,14 @@
 import { Buffer } from "buffer";
 import { OUTPUT_FORMAT } from "./OUTPUT_FORMAT";
-import { PITCH } from "./PITCH";
-import { RATE } from "./RATE";
-import { VOLUME } from "./VOLUME";
+import type { PITCH } from "./PITCH";
+import type { RATE } from "./RATE";
+import type { VOLUME } from "./VOLUME";
 
 function generateRandomValue(length: number) {
-    let cryptoObj = window.crypto;
-    let randomValues = new Uint8Array(length);
+    const cryptoObj = window.crypto;
+    const randomValues = new Uint8Array(length);
     cryptoObj.getRandomValues(randomValues);
-    return Array.from(randomValues, function (byte) {
-        return ("0" + byte.toString(16)).slice(-2);
-    }).join("");
+    return Array.from(randomValues, (byte) => `0${byte.toString(16)}`.slice(-2)).join("");
 }
 
 class s {
@@ -49,9 +47,9 @@ class s {
 
     emit(eventName: string, data: any) {
         if (this.eventListeners[eventName]) {
-            this.eventListeners[eventName].forEach((callback) => {
+            for (const callback of this.eventListeners[eventName]) {
                 callback(data);
-            });
+            }
         }
     }
 }
@@ -103,8 +101,10 @@ export class ProsodyOptions {
 export class MsEdgeTTS {
     static OUTPUT_FORMAT = OUTPUT_FORMAT;
     private static TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
-    private static VOICES_URL = `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
-    private static SYNTH_URL = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
+    private static VOICES_URL =
+        `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
+    private static SYNTH_URL =
+        `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
     private static BINARY_DELIM = "Path:audio\r\n";
     private static VOICE_LANG_REGEX = /\w{2}-\w{2}/;
     private readonly _enableLogger;
@@ -128,14 +128,14 @@ export class MsEdgeTTS {
      * @param agent (optional, **NOT SUPPORTED IN BROWSER**) Use a custom http.Agent implementation like [https-proxy-agent](https://github.com/TooTallNate/proxy-agents) or [socks-proxy-agent](https://github.com/TooTallNate/proxy-agents/tree/main/packages/socks-proxy-agent).
      * @param enableLogger=false whether to enable the built-in logger. This logs connections inits, disconnects, and incoming data to the console
      */
-    public constructor(agent?, enableLogger: boolean = false) {
+    public constructor(agent?, enableLogger = false) {
         this._enableLogger = enableLogger;
         this._isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
     }
 
     private async _send(message) {
         for (let i = 1; i <= 3 && this._ws.readyState !== this._ws.OPEN; i++) {
-            if (i == 1) {
+            if (i === 1) {
                 this._startTime = Date.now();
             }
             this._log("connecting: ", i);
@@ -167,7 +167,7 @@ export class MsEdgeTTS {
                             }
                         }
                     }
-                `
+                `,
                 ).then(resolve);
             };
             this._ws.onmessage = (m) => {
@@ -202,8 +202,8 @@ export class MsEdgeTTS {
                     this._queue[requestId].Pclosed();
                 }
             };
-            this._ws.onerror = function (error) {
-                reject("Connect Error: " + error);
+            this._ws.onerror = (error) => {
+                reject(`Connect Error: ${error}`);
             };
         });
     }
@@ -311,9 +311,8 @@ export class MsEdgeTTS {
         this._metadataCheck();
 
         const requestId = generateRandomValue(16);
-        const request =
-            `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n
-                ` + requestSSML.trim();
+        const request = `X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n
+                ${requestSSML.trim()}`;
         // https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/speech-synthesis-markup
         const readable = new s();
         this._queue[requestId] = readable;
