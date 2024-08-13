@@ -11,41 +11,33 @@ function generateRandomValue(length: number) {
     return Array.from(randomValues, (byte) => `0${byte.toString(16)}`.slice(-2)).join("");
 }
 
+type T = "data" | "close" | "end";
+
 class s {
-    eventListeners: { [key: string]: ((...arg) => void)[] } = {};
-    end = false;
+    eventListeners: { [key in T]: ((...arg) => void)[] } = { end: [], close: [], data: [] };
     constructor() {
-        this.eventListeners = {};
+        this.eventListeners = { end: [], close: [], data: [] };
     }
 
-    Pdata(item) {
-        this.emit("data", item);
-    }
-
-    Pend(data: metadata) {
-        this.emit("end", data);
-        this.end = true;
-    }
-
-    Pclosed() {
-        this.emit("closed", null);
-    }
-
-    on(eventName: string, callback: (...arg) => void) {
+    on(eventName: T, callback: (...arg) => void) {
         if (!this.eventListeners[eventName]) {
             this.eventListeners[eventName] = [];
         }
         this.eventListeners[eventName].push(callback);
     }
 
+    onData(cb: (data: Uint8Array) => void) {
+        this.eventListeners.data.push(cb);
+    }
+
+    onClose(cb: () => void) {
+        this.eventListeners.close.push(cb);
+    }
     onEnd(cb: (metadata: metadata) => void) {
-        if (!this.eventListeners.end) {
-            this.eventListeners.end = [];
-        }
         this.eventListeners.end.push(cb);
     }
 
-    emit(eventName: string, data: any) {
+    emit(eventName: T, data: any) {
         if (this.eventListeners[eventName]) {
             for (const callback of this.eventListeners[eventName]) {
                 callback(data);
@@ -178,7 +170,7 @@ export class MsEdgeTTS {
                     // start of turn, ignore
                 } else if (message.includes("Path:turn.end")) {
                     // end of turn, close stream
-                    this._queue[requestId].Pend(datas);
+                    this._queue[requestId].emit("end", datas);
                 } else if (message.includes("Path:response")) {
                     // context response, ignore
                 } else if (message.includes("Path:audio")) {
@@ -199,7 +191,7 @@ export class MsEdgeTTS {
             this._ws.onclose = () => {
                 this._log("disconnected after:", (Date.now() - this._startTime) / 1000, "seconds");
                 for (const requestId in this._queue) {
-                    this._queue[requestId].Pclosed();
+                    this._queue[requestId].emit("close", null);
                 }
             };
             this._ws.onerror = (error) => {
@@ -211,7 +203,7 @@ export class MsEdgeTTS {
     private cacheAudioData(m: Buffer, requestId: string) {
         const index = m.indexOf(MsEdgeTTS.BINARY_DELIM) + MsEdgeTTS.BINARY_DELIM.length;
         const audioData = m.slice(index, m.length);
-        this._queue[requestId].Pdata(audioData);
+        this._queue[requestId].emit("data", audioData);
         this._log("receive audio chunk size: ", audioData?.length);
     }
 
