@@ -140,7 +140,7 @@ export class MsEdgeTTS {
         this._ws = new WebSocket(MsEdgeTTS.SYNTH_URL);
 
         this._ws.binaryType = "arraybuffer";
-        const datas: metadata = [];
+        let datas: metadata = [];
         return new Promise((resolve, reject) => {
             this._ws.onopen = () => {
                 this._log("Connected in", (Date.now() - this._startTime) / 1000, "seconds");
@@ -167,7 +167,8 @@ export class MsEdgeTTS {
                 const message = buffer.toString();
                 const requestId = /X-RequestId:(.*?)\r\n/gm.exec(message)[1];
                 if (message.includes("Path:turn.start")) {
-                    // start of turn, ignore
+                    // start of turn
+                    datas = [];
                 } else if (message.includes("Path:turn.end")) {
                     // end of turn, close stream
                     this._queue[requestId].emit("end", datas);
