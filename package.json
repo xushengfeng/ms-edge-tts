@@ -1,6 +1,6 @@
 {
     "name": "msedge-tts-browserify",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "description": "An Azure Speech Service module that uses the Microsoft Edge Read Aloud API.",
     "author": "xushengfeng",
     "license": "MIT",
