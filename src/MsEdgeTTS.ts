@@ -3,6 +3,8 @@ import { OUTPUT_FORMAT } from "./OUTPUT_FORMAT";
 import type { PITCH } from "./PITCH";
 import type { RATE } from "./RATE";
 import type { VOLUME } from "./VOLUME";
+import sha256 from "crypto-js/sha256";
+import enc from "crypto-js/enc-hex";
 
 function generateRandomValue(length: number) {
     const cryptoObj = window.crypto;
@@ -90,13 +92,29 @@ export class ProsodyOptions {
     volume?: VOLUME | string | number = 100.0;
 }
 
+const msConfig = {
+    TRUSTED_CLIENT_TOKEN: "6A5AA1D4EAFF4E9FB37E23D68491D6F4",
+    EDGE_VERSION: "1-132.0.2957.140",
+};
+
+function drm() {
+    const WINDOWS_FILE_TIME_EPOCH = 11644473600;
+    const ticks = Math.floor(Date.now() / 1000 + Number(WINDOWS_FILE_TIME_EPOCH)) * 10000000;
+    const roundedTicks = ticks - (ticks % 3000000000);
+    const strToHash = roundedTicks.toString() + msConfig.TRUSTED_CLIENT_TOKEN;
+    return sha256(strToHash).toString(enc).toUpperCase();
+}
+
 export class MsEdgeTTS {
     static OUTPUT_FORMAT = OUTPUT_FORMAT;
-    private static TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
     private static VOICES_URL =
-        `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
+        `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${msConfig.TRUSTED_CLIENT_TOKEN}`;
     private static SYNTH_URL =
-        `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
+        `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?${new URLSearchParams({
+            TrustedClientToken: msConfig.TRUSTED_CLIENT_TOKEN,
+            "Sec-MS-GEC": drm(),
+            "Sec-MS-GEC-Version": msConfig.EDGE_VERSION,
+        })}`;
     private static BINARY_DELIM = "Path:audio\r\n";
     private static VOICE_LANG_REGEX = /\w{2}-\w{2}/;
     private readonly _enableLogger;
