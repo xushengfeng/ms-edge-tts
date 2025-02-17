@@ -117,12 +117,11 @@ export class MsEdgeTTS {
         })}`;
     private static BINARY_DELIM = "Path:audio\r\n";
     private static VOICE_LANG_REGEX = /\w{2}-\w{2}/;
-    private readonly _enableLogger;
-    private readonly _isBrowser: boolean;
+    private readonly _enableLogger: boolean;
     private _ws: WebSocket;
-    private _voice;
-    private _voiceLocale;
-    private _outputFormat;
+    private _voice: string;
+    private _voiceLocale: string;
+    private _outputFormat: string;
     private _queue: { [key: string]: s } = {};
     private _startTime = 0;
 
@@ -132,15 +131,8 @@ export class MsEdgeTTS {
         }
     }
 
-    /**
-     * Create a new `MsEdgeTTS` instance.
-     *
-     * @param agent (optional, **NOT SUPPORTED IN BROWSER**) Use a custom http.Agent implementation like [https-proxy-agent](https://github.com/TooTallNate/proxy-agents) or [socks-proxy-agent](https://github.com/TooTallNate/proxy-agents/tree/main/packages/socks-proxy-agent).
-     * @param enableLogger=false whether to enable the built-in logger. This logs connections inits, disconnects, and incoming data to the console
-     */
-    public constructor(agent?, enableLogger = false) {
+    public constructor(enableLogger = false) {
         this._enableLogger = enableLogger;
-        this._isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
     }
 
     private async _send(message) {
@@ -164,19 +156,20 @@ export class MsEdgeTTS {
                 this._log("Connected in", (Date.now() - this._startTime) / 1000, "seconds");
                 this._send(
                     `Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n
-                    {
-                        "context": {
-                            "synthesis": {
-                                "audio": {
-                                    "metadataoptions": {
-                                        "sentenceBoundaryEnabled": "true",
-                                        "wordBoundaryEnabled": "true"
+                    ${JSON.stringify({
+                        context: {
+                            synthesis: {
+                                audio: {
+                                    metadataoptions: {
+                                        sentenceBoundaryEnabled: "true",
+                                        wordBoundaryEnabled: "true",
                                     },
-                                    "outputFormat": "${this._outputFormat}"
-                                }
-                            }
-                        }
-                    }
+                                    outputFormat: this._outputFormat,
+                                },
+                            },
+                        },
+                    })}
+
                 `,
                 ).then(resolve);
             };
@@ -241,15 +234,11 @@ export class MsEdgeTTS {
      * Fetch the list of voices available in Microsoft Edge.
      * These, however, are not all. The complete list of voices supported by this module [can be found here](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support) (neural, standard, and preview).
      */
-    getVoices(): Promise<Voice[]> {
-        return new Promise((resolve, reject) => {
-            fetch(MsEdgeTTS.VOICES_URL, {
-                method: "get",
-            })
-                .then((json) => json.json())
-                .then((res) => resolve(res))
-                .catch(reject);
+    async getVoices(): Promise<Voice[]> {
+        const r = await fetch(MsEdgeTTS.VOICES_URL, {
+            method: "get",
         });
+        return r.json();
     }
 
     /**
